@@ -12,10 +12,8 @@ import net.minecraft.block.Block;
 import net.minecraft.block.FlowerBlock;
 import net.minecraft.block.TallFlowerBlock;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screen.BiomeGeneratorTypeScreens;
 import net.minecraft.client.renderer.BufferBuilder;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.RenderTypeBuffers;
 import net.minecraft.client.renderer.RenderTypeLookup;
 import net.minecraft.client.renderer.entity.PlayerRenderer;
 import net.minecraft.client.settings.KeyBinding;
@@ -37,7 +35,6 @@ import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.DeferredWorkQueue;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
-import net.minecraftforge.fml.common.ObfuscationReflectionHelper;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -75,16 +72,15 @@ import vazkii.botania.common.item.equipment.tool.terrasteel.ItemTerraPick;
 import vazkii.botania.common.item.relic.ItemInfiniteFruit;
 import vazkii.botania.common.item.rod.ItemTornadoRod;
 import vazkii.botania.common.lib.LibMisc;
-import vazkii.botania.common.lib.LibObfuscation;
+import vazkii.botania.mixin.AccessorBiomeGeneratorTypeScreens;
+import vazkii.botania.mixin.AccessorRenderTypeBuffers;
 import vazkii.patchouli.api.IMultiblock;
 import vazkii.patchouli.api.PatchouliAPI;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.invoke.MethodHandle;
 import java.time.LocalDateTime;
 import java.time.Month;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.SortedMap;
@@ -95,7 +91,6 @@ public class ClientProxy implements IProxy {
 
 	public static boolean jingleTheBells = false;
 	public static boolean dootDoot = false;
-	private static final MethodHandle REGISTER_PROPERTY_GETTER = LibObfuscation.getMethod(ItemModelsProperties.class, "func_239418_a_", Item.class, ResourceLocation.class, IItemPropertyGetter.class);
 
 	public static KeyBinding CORPOREA_REQUEST;
 
@@ -112,7 +107,6 @@ public class ClientProxy implements IProxy {
 		modBus.addListener(MiscellaneousIcons.INSTANCE::onTextureStitchPost);
 		modBus.addListener(MiscellaneousIcons.INSTANCE::onModelRegister);
 		modBus.addListener(MiscellaneousIcons.INSTANCE::onModelBake);
-		modBus.addListener(SplashHandler::registerFactories);
 		modBus.addListener(ModelHandler::registerModels);
 		modBus.addListener(ModParticles.FactoryHandler::registerFactories);
 
@@ -160,14 +154,7 @@ public class ClientProxy implements IProxy {
 		registerRenderTypes();
 
 		DeferredWorkQueue.runLater(() -> {
-			MethodHandle worldTypesGetter = LibObfuscation.getGetter(BiomeGeneratorTypeScreens.class, "field_239068_c_");
-			try {
-				@SuppressWarnings("unchecked")
-				List<BiomeGeneratorTypeScreens> worldTypes = (List<BiomeGeneratorTypeScreens>) worldTypesGetter.invokeExact();
-				worldTypes.add(WorldTypeSkyblock.INSTANCE);
-			} catch (Throwable throwable) {
-				throw new RuntimeException(throwable);
-			}
+			AccessorBiomeGeneratorTypeScreens.getAllTypes().add(WorldTypeSkyblock.INSTANCE);
 
 			CORPOREA_REQUEST = new KeyBinding("key.botania_corporea_request", KeyConflictContext.GUI, InputMappings.getInputByCode(GLFW.GLFW_KEY_C, 0), LibMisc.MOD_NAME);
 			ClientRegistry.registerKeyBinding(ClientProxy.CORPOREA_REQUEST);
@@ -177,11 +164,7 @@ public class ClientProxy implements IProxy {
 	}
 
 	private static void registerPropertyGetter(IItemProvider item, ResourceLocation id, IItemPropertyGetter propGetter) {
-		try {
-			REGISTER_PROPERTY_GETTER.invokeExact(item.asItem(), id, propGetter);
-		} catch (Throwable throwable) {
-			throw new RuntimeException(throwable);
-		}
+		ItemModelsProperties.func_239418_a_(item.asItem(), id, propGetter);
 	}
 
 	private static void registerPropertyGetters() {
@@ -313,7 +296,7 @@ public class ClientProxy implements IProxy {
 			ColorHandler.init();
 
 			// Needed to prevent mana pools on carts from X-raying through the cart
-			SortedMap<RenderType, BufferBuilder> layers = ObfuscationReflectionHelper.getPrivateValue(RenderTypeBuffers.class, Minecraft.getInstance().getRenderTypeBuffers(), "field_228480_b_");
+			SortedMap<RenderType, BufferBuilder> layers = ((AccessorRenderTypeBuffers) Minecraft.getInstance().getRenderTypeBuffers()).getFixedBuffers();
 			layers.put(RenderHelper.MANA_POOL_WATER, new BufferBuilder(RenderHelper.MANA_POOL_WATER.getBufferSize()));
 		});
 	}
